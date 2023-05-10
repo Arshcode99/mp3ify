@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>MP3IFY | MP3 to WAV Converter</title>
+    <style>
+      body{
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        overflow: hidden;
+      }
+      form{
+        width: 30vw;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        text-align: left;
+        padding: 10px;
+        border: 0.1px solid rgba(0,0,0,0.1);
+        border-radius: 4px;
+      }
+      input, button{
+        padding: 10px 20px;
+        border: 0.1px solid rgba(0,0,0,0.1);
+        border-radius: 4px;
+        outline: none;
+        cursor: pointer;
+      }
+      button{
+        background: mediumaquamarine;
+        color: #fff;
+      }
+      button:hover{
+        background: rgb(43, 171, 128);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>MP3 to WAV Converter - Truelancer Project</h1>
+    <form>
+      <label for="mp3-file">Select an MP3 file:</label>
+      <input type="file" id="mp3-file"><br><br>
+      <button type="button" onclick="convertToWav()">Convert to WAV</button>
+    </form>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.6.0/jszip.min.js"></script>
+
+    <script>
+      function convertToWav() {
+  const mp3File = document.getElementById('mp3-file').files[0];
+  if (!mp3File) {
+    alert('Please select an MP3 file to convert.');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const mp3Data = e.target.result;
+    const context = new (window.AudioContext || window.webkitAudioContext)();
+    context.decodeAudioData(mp3Data, function(decodedData) {
+      const wavData = encodeWav(decodedData);
+      const zip = new JSZip();
+      zip.file(mp3File.name.replace('.mp3', '') + '.wav', wavData);
+      zip.generateAsync({type:"blob"}).then(function(content) {
+        const url = URL.createObjectURL(content);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = mp3File.name.replace('.mp3', '') + '.zip';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      });
+    });
+  }
+  reader.readAsArrayBuffer(mp3File);
+}
+
+
+      function encodeWav(decodedData) {
+        const numChannels = decodedData.numberOfChannels;
+        const sampleRate = decodedData.sampleRate;
+        const bitDepth = 16;
+        const bytesPerSample = bitDepth / 8;
+        const samples = decodedData.getChannelData(0).length;
+        const data = new ArrayBuffer(44 + samples * numChannels * bytesPerSample);
+        const view = new DataView(data);
+        // RIFF header
+        writeString(view, 0, 'RIFF');
+        view.setUint32(4, 36 + samples * numChannels * bytesPerSample, true);
+        writeString(view, 8, 'WAVE');
+        // fmt subchunk
+        writeString(view, 12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true); // PCM
+        view.setUint16(22, numChannels, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * numChannels * bytesPerSample, true);
+        view.setUint16(32, numChannels * bytesPerSample, true);
+        view.setUint16(34, bitDepth, true);
+        // data subchunk
+        writeString(view, 36, 'data');
+        view.setUint32(40, samples * numChannels * bytesPerSample, true);
+        writeData(view, 44, decodedData);
+        return data;
+      }
+
+      function writeString(view, offset, string) {
+        for (let i = 0; i < string.length; i++) {
+          view.setUint8(offset + i, string.charCodeAt(i));
+        }
+      }
+
+      function writeData(view, offset, data) {
+        const numChannels = data.numberOfChannels;
+        const samples = data.getChannelData(0);
+        const bytesPerSample = 2;
+        for (let i = 0; i < samples.length; i++) {
+const sample = samples[i];
+const offsetChannel = offset + i * numChannels * bytesPerSample;
+for (let j = 0; j < numChannels; j++) {
+const offsetSample = offsetChannel + j * bytesPerSample;
+const scaledSample = Math.max(-1, Math.min(1, sample)) * 0x7FFF;
+view.setInt16(offsetSample, scaledSample, true);
+}
+}
+}
+</script>
+
+  </body>
+</html>
