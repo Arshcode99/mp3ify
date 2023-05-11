@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <title>MP3IFY | MP3 to WAV Converter</title>
     <style>
-      body{
+      body {
         width: 100vw;
         height: 100vh;
         display: flex;
@@ -14,28 +14,29 @@
         text-align: center;
         overflow: hidden;
       }
-      form{
+      form {
         width: 30vw;
         display: flex;
         flex-direction: column;
         gap: 10px;
         text-align: left;
         padding: 10px;
-        border: 0.1px solid rgba(0,0,0,0.1);
+        border: 0.1px solid rgba(0, 0, 0, 0.1);
         border-radius: 4px;
       }
-      input, button{
+      input,
+      button {
         padding: 10px 20px;
-        border: 0.1px solid rgba(0,0,0,0.1);
+        border: 0.1px solid rgba(0, 0, 0, 0.1);
         border-radius: 4px;
         outline: none;
         cursor: pointer;
       }
-      button{
+      button {
         background: mediumaquamarine;
         color: #fff;
       }
-      button:hover{
+      button:hover {
         background: rgb(43, 171, 128);
       }
     </style>
@@ -44,40 +45,66 @@
     <h1>MP3 to WAV Converter - Truelancer Project</h1>
     <form>
       <label for="mp3-file">Select an MP3 file:</label>
-      <input type="file" id="mp3-file"><br><br>
+      <input type="file" id="mp3-file" required />
       <button type="button" onclick="convertToWav()">Convert to WAV</button>
     </form>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.6.0/jszip.min.js"></script>
 
     <script>
+      
       function convertToWav() {
-  const mp3File = document.getElementById('mp3-file').files[0];
+  const mp3File = document.getElementById("mp3-file").files[0];
   if (!mp3File) {
-    alert('Please select an MP3 file to convert.');
+    alert("Please select an MP3 file to convert.");
     return;
   }
   const reader = new FileReader();
-  reader.onload = function(e) {
+  reader.onload = function (e) {
     const mp3Data = e.target.result;
-    const context = new (window.AudioContext || window.webkitAudioContext)();
-    context.decodeAudioData(mp3Data, function(decodedData) {
+    const context = new (window.AudioContext ||
+      window.webkitAudioContext)();
+    context.decodeAudioData(mp3Data, function (decodedData) {
       const wavData = encodeWav(decodedData);
-      const zip = new JSZip();
-      zip.file(mp3File.name.replace('.mp3', '') + '.wav', wavData);
-      zip.generateAsync({type:"blob"}).then(function(content) {
-        const url = URL.createObjectURL(content);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = mp3File.name.replace('.mp3', '') + '.zip';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+      const url = URL.createObjectURL(new Blob([wavData], { type: "audio/wav" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = mp3File.name.replace(".mp3", "") + ".wav";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      // Compress the WAV file using media.io API
+      fetch('https://api.media.io/v2/convert', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdXRoX2lkIjoyMDM4ODk1LCJ3c2lkIjoiMjcyNjg1ODk1IiwiZW1haWwiOiJhcnNoY29kZTk5QGdtYWlsLmNvbSIsImF1ZCI6IjUyNGEwYWNkMTY5NGE4YmRiMWIxNDRkNDQzNTlhNTlhIiwiZXhwIjoxOTk5MTQ1NTI4LCJqdGkiOiJkZDYwODUyMmRmNzAzMzliMWNiMzIxZWMyZTc5OGFjZSIsImlhdCI6MTY4Mzc4NTUyOCwiaXNzIjoibWVkaWEuaW8iLCJuYmYiOjE2ODM3ODQ1MjgsInN1YiI6ImZlOTBiOWRlNzQ5MTgzYmU2MzQ1MTEyN2I3YWMyYzBmIn0.-MXFueRcY70FYnkOg2aWcKniXFd8NwaZFm5SGnn3esA',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          input: url,
+          output_format: 'wav'
+        })
+      })
+      .then(response => response.blob())
+      .then(compressedWavBlob => {
+        const compressedWavUrl = URL.createObjectURL(compressedWavBlob);
+        const compressedWavLink = document.createElement("a");
+        compressedWavLink.href = compressedWavUrl;
+        compressedWavLink.download = mp3File.name.replace(".mp3", "") + "_compressed.wav";
+        document.body.appendChild(compressedWavLink);
+        compressedWavLink.click();
+        document.body.removeChild(compressedWavLink);
+        URL.revokeObjectURL(compressedWavUrl);
+      })
+      .catch(error => {
+        console.log(error);
       });
     });
-  }
+  };
   reader.readAsArrayBuffer(mp3File);
 }
+
 
 
       function encodeWav(decodedData) {
@@ -86,14 +113,16 @@
         const bitDepth = 16;
         const bytesPerSample = bitDepth / 8;
         const samples = decodedData.getChannelData(0).length;
-        const data = new ArrayBuffer(44 + samples * numChannels * bytesPerSample);
+        const data = new ArrayBuffer(
+          44 + samples * numChannels * bytesPerSample
+        );
         const view = new DataView(data);
         // RIFF header
-        writeString(view, 0, 'RIFF');
+        writeString(view, 0, "RIFF");
         view.setUint32(4, 36 + samples * numChannels * bytesPerSample, true);
-        writeString(view, 8, 'WAVE');
+        writeString(view, 8, "WAVE");
         // fmt subchunk
-        writeString(view, 12, 'fmt ');
+        writeString(view, 12, "fmt ");
         view.setUint32(16, 16, true);
         view.setUint16(20, 1, true); // PCM
         view.setUint16(22, numChannels, true);
@@ -102,9 +131,31 @@
         view.setUint16(32, numChannels * bytesPerSample, true);
         view.setUint16(34, bitDepth, true);
         // data subchunk
-        writeString(view, 36, 'data');
-        view.setUint32(40, samples * numChannels * bytesPerSample, true);
-        writeData(view, 44, decodedData);
+        writeString(view, 36, "data");
+
+        // Downsample the audio data
+        const downsamplingFactor = 2;
+        const downsampledData = new Float32Array(
+          Math.floor(samples / downsamplingFactor)
+        );
+        for (let i = 0; i < downsampledData.length; i++) {
+          downsampledData[i] =
+            decodedData.getChannelData(0)[i * downsamplingFactor];
+        }
+
+        const downsampledSamples = downsampledData.length;
+        view.setUint32(
+          40,
+          downsampledSamples * numChannels * bytesPerSample,
+          true
+        );
+        writeData(view, 44, {
+          numberOfChannels: numChannels,
+          getChannelData: function () {
+            return downsampledData;
+          },
+        });
+
         return data;
       }
 
@@ -119,16 +170,15 @@
         const samples = data.getChannelData(0);
         const bytesPerSample = 2;
         for (let i = 0; i < samples.length; i++) {
-const sample = samples[i];
-const offsetChannel = offset + i * numChannels * bytesPerSample;
-for (let j = 0; j < numChannels; j++) {
-const offsetSample = offsetChannel + j * bytesPerSample;
-const scaledSample = Math.max(-1, Math.min(1, sample)) * 0x7FFF;
-view.setInt16(offsetSample, scaledSample, true);
-}
-}
-}
-</script>
-
+          const sample = samples[i];
+          const offsetChannel = offset + i * numChannels * bytesPerSample;
+          for (let j = 0; j < numChannels; j++) {
+            const offsetSample = offsetChannel + j * bytesPerSample;
+            const scaledSample = Math.max(-1, Math.min(1, sample)) * 0x7fff;
+            view.setInt16(offsetSample, scaledSample, true);
+          }
+        }
+      }
+    </script>
   </body>
 </html>
